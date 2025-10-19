@@ -85,10 +85,11 @@ with tabs[3]:
         st.info("No notices")
     else:
         for _, r in df.iterrows():
-            st.write(f"### {r['Title']}")
-{r['Message']}
-*Posted by {r['PostedBy']}*")
-
+            st.write(f"""
+### {r['Title']}
+**{r['ShortDesc']}**
+*Posted by {r['PostedBy']}*
+""")
 with tabs[4]:
     st.header("Admin")
     pw = st.text_input("Admin Password", type="password")
@@ -105,4 +106,5 @@ with tabs[4]:
                 st.success("Posted")
         else:
             st.error("Incorrect password")
+
 
