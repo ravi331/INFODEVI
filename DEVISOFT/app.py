@@ -85,7 +85,7 @@ with tabs[3]:
         st.info("No notices")
     else:
         for _, r in df.iterrows():
-            st.write(f"### {r['Title']}
+            st.write(f"### {r['Title']}")
 {r['Message']}
 *Posted by {r['PostedBy']}*")
 
@@ -105,3 +105,4 @@ with tabs[4]:
                 st.success("Posted")
         else:
             st.error("Incorrect password")
+
