@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import os, random
+import random
 
 # --------------------
 # CONFIGURATION
@@ -9,12 +9,14 @@ import os, random
 ADMIN_PASSWORD = "sgs2025"
 REG_FILE = "registrations.csv"
 NOTICE_FILE = "notices.csv"
-ALLOWED_FILE = "allowed_users.csv"
+
+# ✅ Load allowed users DIRECTLY from GitHub (fixed issue)
+ALLOWED_CSV_URL = "https://raw.githubusercontent.com/ravi331/DEVISOFT/main/allowed_users.csv"
 
 st.set_page_config(page_title="SGS Annual Function", layout="wide")
 
 # --------------------
-# LOAD CSV FUNCTION
+# FUNCTION TO LOAD CSV (Registrations & Notices only)
 # --------------------
 def load_csv(file, columns):
     try:
@@ -24,15 +26,13 @@ def load_csv(file, columns):
         df.to_csv(file, index=False)
         return df
 
-# Load CSVs
 reg_df = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contact","Address","Bus","Status"])
 notice_df = load_csv(NOTICE_FILE, ["Timestamp","Title","Message","PostedBy"])
-allowed_df = load_csv(ALLOWED_FILE, ["mobile_number","student_name"])
-# 🔍 Debug: Check if CSV is loaded correctly
-st.write("✅ Loaded Allowed Users:")
-st.dataframe(allowed_df)
 
-# ✅ Clean / normalize mobile numbers in CSV (always keep last 10 digits)
+# ✅ Load allowed users from GitHub
+allowed_df = pd.read_csv(ALLOWED_CSV_URL)
+
+# ✅ Clean & normalize phone numbers (always 10 digits)
 allowed_df["mobile_number"] = (
     allowed_df["mobile_number"]
     .astype(str)
@@ -40,11 +40,15 @@ allowed_df["mobile_number"] = (
     .str.replace("+91", "")
     .str.replace("-", "")
     .str.strip()
-    .str[-10:]               # Always last 10 digits
+    .str[-10:]    # keep last 10 digits only
 )
 
+# 🔍 Debug (You can remove after testing)
+st.write("✅ Loaded Allowed Users from GitHub:")
+st.dataframe(allowed_df)
+
 # --------------------
-# SESSION INIT
+# SESSION INITIALIZATION
 # --------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -56,39 +60,37 @@ def login():
     st.sidebar.title("Login")
     mobile = st.sidebar.text_input("Enter 10-digit Mobile").strip()
 
-    # Keep only last 10 digits if user types +91 or country code
+    # If someone types +91xxxxxxxxxx → we still take last 10 digits
     if len(mobile) > 10:
         mobile = mobile[-10:]
 
     if st.sidebar.button("Send OTP"):
         if mobile in allowed_df["mobile_number"].values:
-            otp = str(random.randint(100000,999999))
+            otp = str(random.randint(100000, 999999))
             st.session_state.otp = otp
             st.session_state.mobile = mobile
             st.sidebar.success("OTP (Test Mode): " + otp)
         else:
-            st.sidebar.error("This number is not registered")
+            st.sidebar.error("❌ This number is not registered")
 
     if "otp" in st.session_state:
         code = st.sidebar.text_input("Enter OTP")
         if st.sidebar.button("Verify"):
             if code == st.session_state.otp:
                 st.session_state.logged_in = True
-                st.sidebar.success("Login successful")
+                st.sidebar.success("✅ Login successful")
             else:
-                st.sidebar.error("Wrong OTP")
+                st.sidebar.error("❌ Wrong OTP")
 
-# --------------------
-# RUN LOGIN
-# --------------------
+# Run login
 login()
 if not st.session_state.logged_in:
     st.stop()
 
 # --------------------
-# MAIN APP TABS
+# MAIN TABS AFTER LOGIN
 # --------------------
-tabs = st.tabs(["Home","Registration","List","Notices","Admin"])
+tabs = st.tabs(["Home", "Registration", "List", "Notices", "Admin"])
 
 # HOME TAB
 with tabs[0]:
@@ -104,14 +106,14 @@ with tabs[1]:
         sec = st.text_input("Section")
         item = st.text_input("Item")
         address = st.text_area("Address")
-        bus = st.radio("Using Bus?",["Yes","No"])
+        bus = st.radio("Using Bus?", ["Yes", "No"])
         contact = st.text_input("Contact", value=st.session_state.mobile)
 
         if st.form_submit_button("Submit"):
             df = pd.read_csv(REG_FILE)
             df.loc[len(df)] = [datetime.now(), name, clas, sec, item, contact, address, bus, "Pending"]
             df.to_csv(REG_FILE, index=False)
-            st.success("Registered")
+            st.success("✅ Registered Successfully")
 
 # LIST TAB
 with tabs[2]:
@@ -123,7 +125,7 @@ with tabs[3]:
     st.header("Notices")
     df = pd.read_csv(NOTICE_FILE)
     if df.empty:
-        st.info("No notices")
+        st.info("No notices yet")
     else:
         for _, r in df.iterrows():
             st.write(f"""
@@ -134,11 +136,11 @@ with tabs[3]:
 
 # ADMIN TAB
 with tabs[4]:
-    st.header("Admin")
+    st.header("Admin Section")
     pw = st.text_input("Admin Password", type="password")
     if st.button("Login as Admin"):
         if pw == ADMIN_PASSWORD:
-            st.success("Admin Logged In")
+            st.success("✅ Admin Logged In")
             title = st.text_input("Notice Title")
             msg = st.text_area("Message")
             by = st.text_input("Posted By", value="Admin")
@@ -147,7 +149,6 @@ with tabs[4]:
                 df = pd.read_csv(NOTICE_FILE)
                 df.loc[len(df)] = [datetime.now(), title, msg, by]
                 df.to_csv(NOTICE_FILE, index=False)
-                st.success("Posted")
+                st.success("✅ Notice Posted")
         else:
-            st.error("Incorrect password")
-
+            st.error("❌ Incorrect password")
