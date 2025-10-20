@@ -30,18 +30,19 @@ reg_df = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contac
 notice_df = load_csv(NOTICE_FILE, ["Timestamp","Title","Message","PostedBy"])
 
 # ✅ Load allowed users from GitHub
-allowed_df = pd.read_csv(ALLOWED_CSV_URL)
+# ✅ Load allowed users locally (no URL required)
+allowed_df = pd.read_csv("allowed_users.csv")
 
-# ✅ Clean & normalize phone numbers (always 10 digits)
+# ✅ Clean formatting
 allowed_df["mobile_number"] = (
     allowed_df["mobile_number"]
     .astype(str)
     .str.replace(" ", "")
     .str.replace("+91", "")
-    .str.replace("-", "")
     .str.strip()
-    .str[-10:]    # keep last 10 digits only
+    .str[-10:]
 )
+
 
 # 🔍 Debug (You can remove after testing)
 st.write("✅ Loaded Allowed Users from GitHub:")
@@ -152,3 +153,4 @@ with tabs[4]:
                 st.success("✅ Notice Posted")
         else:
             st.error("❌ Incorrect password")
+
