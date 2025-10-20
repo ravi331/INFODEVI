@@ -4,49 +4,32 @@ from datetime import datetime, timedelta
 import random, os, time
 from io import BytesIO
 
-# -----------------------------------------
-# Page & Style
-# -----------------------------------------
+# -------------------------------------------------
+# Streamlit Page Settings
+# -------------------------------------------------
 st.set_page_config(page_title="SGS Annual Function", layout="wide", page_icon="🎉")
 
-st.markdown("""
-<style>
-    .main { background: #fafbff; }
-    .sgs-banner {
-        background: linear-gradient(90deg, #7c3aed, #f59e0b);
-        color: white; padding: 12px 18px; border-radius: 14px;
-        margin-bottom: 15px; font-weight: bold; font-size: 20px;
-        display: inline-block;
-    }
-    .countdown { font-size: 18px; font-weight: 600; color:#222; margin-top:10px }
-    .notice-banner {
-        background: #fff7e6; border:1px solid #ffddaa; color:#7a4c00;
-        padding:10px; border-radius:10px; margin-bottom:15px;
-    }
-    .muted { color:#666; font-size:13px; }
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
-    .stTabs [data-baseweb="tab"] { padding:10px 16px; border-radius:10px; background:#ffffffaa; }
-    .stButton>button { border-radius:10px; }
-</style>
-""", unsafe_allow_html=True)
-
-# -----------------------------------------
-# Configuration
-# -----------------------------------------
+# -------------------------------------------------
+# Constants & File Names
+# -------------------------------------------------
 ADMIN_PASSWORD = "sgs2025"
+EVENT_DATETIME = datetime(2025, 12, 20, 0, 0, 0)
+
+# CSV Files
 REG_FILE = "registrations.csv"
 NOTICE_FILE = "notices.csv"
 ALLOWED_FILE = "allowed_users.csv"
 
-EVENT_DATETIME = datetime(2025, 12, 20, 0, 0, 0)   # For countdown
-
+# Directory Path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# -----------------------------------------
+# -------------------------------------------------
 # Helper Functions
-# -----------------------------------------
+# -------------------------------------------------
+def safe_path(filename):
+    return os.path.join(BASE_DIR, filename)
+
 def load_csv(file, columns):
-    """Loads or creates a CSV file with given columns"""
     try:
         return pd.read_csv(file)
     except:
@@ -54,50 +37,47 @@ def load_csv(file, columns):
         df.to_csv(file, index=False)
         return df
 
-def normalize_10_digits(series):
-    """Converts phone numbers to 10-digit string"""
+def normalize_number(series):
+    """Ensure numbers are only last 10 digits"""
     return (series.astype(str)
-                .str.replace(" ", "", regex=False)
-                .str.replace("+91", "", regex=False)
-                .str.replace("-", "", regex=False)
-                .str.strip()
-                .str[-10:])
-
-def time_difference(event_time):
-    """Formats remaining time for countdown"""
-    diff = event_time - datetime.now()
-    if diff.total_seconds() < 0:
-        return "Today is the event! 🎉"
-    days = diff.days
-    hours, rem = divmod(diff.seconds, 3600)
-    minutes, seconds = divmod(rem, 60)
-    return f"{days} days, {hours} hours, {minutes} minutes, {seconds} seconds"
-
-def safe_show_image(filename, width=None):
-    """Safely loads and displays images without breaking"""
-    path = os.path.join(BASE_DIR, filename)
-    if os.path.exists(path):
-        st.image(path, width=width)
+                 .str.replace(" ", "", regex=False)
+                 .str.replace("+91", "", regex=False)
+                 .str.strip()
+                 .str[-10:])
 
 def to_excel_bytes(df):
-    """Exports DataFrame to Excel without extra dependencies like xlsxwriter"""
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Registrations")
+        df.to_excel(writer, index=False, sheet_name="Sheet1")
     output.seek(0)
     return output.read()
 
-# -----------------------------------------
-# Load CSV Data
-# -----------------------------------------
+def safe_show_image(filename, width=None):
+    path = safe_path(filename)
+    if os.path.exists(path):
+        st.image(path, width=width)
+
+def time_left():
+    diff = EVENT_DATETIME - datetime.now()
+    if diff.total_seconds() < 0:
+        return "Today is the Annual Function! 🎉"
+    days = diff.days
+    hours, rem = divmod(diff.seconds, 3600)
+    mins, secs = divmod(rem, 60)
+    return f"{days} days, {hours} hrs, {mins} mins, {secs} secs"
+
+# -------------------------------------------------
+# Load Data
+# -------------------------------------------------
 reg_df = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contact","Address","Bus","Status"])
 notice_df = load_csv(NOTICE_FILE, ["Timestamp","Title","Message","PostedBy"])
-allowed_df = load_csv(ALLOWED_FILE, ["mobile_number","name"])
-allowed_df["mobile_number"] = normalize_10_digits(allowed_df["mobile_number"])
 
-# -----------------------------------------
-# Session States
-# -----------------------------------------
+allowed_df = load_csv(safe_path(ALLOWED_FILE), ["mobile_number","name"])
+allowed_df["mobile_number"] = normalize_number(allowed_df["mobile_number"])
+
+# -------------------------------------------------
+# Session State
+# -------------------------------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "mobile" not in st.session_state:
@@ -107,11 +87,12 @@ if "otp" not in st.session_state:
 if "welcomed" not in st.session_state:
     st.session_state.welcomed = False
 
-# -----------------------------------------
+# -------------------------------------------------
 # Sidebar Login System
-# -----------------------------------------
+# -------------------------------------------------
 def login_sidebar():
     st.sidebar.header("Login")
+
     if not st.session_state.logged_in:
         mobile = st.sidebar.text_input("Enter 10-digit mobile").strip()
         if len(mobile) > 10:
@@ -132,13 +113,14 @@ def login_sidebar():
                 if code == st.session_state.otp:
                     st.session_state.logged_in = True
                     st.session_state.welcomed = False
-                    st.sidebar.success("✅ Login successful")
+                    st.sidebar.success("✅ Login Successful")
                 else:
                     st.sidebar.error("❌ Incorrect OTP")
+
     else:
-        st.sidebar.success(f"Logged in: {st.session_state.mobile}")
+        st.sidebar.success(f"Logged in as: {st.session_state.mobile}")
         if st.sidebar.button("Logout"):
-            for key in ["logged_in","otp","mobile","welcomed"]:
+            for key in ["logged_in", "otp", "mobile", "welcomed"]:
                 if key in st.session_state:
                     del st.session_state[key]
             st.rerun()
@@ -147,11 +129,9 @@ login_sidebar()
 if not st.session_state.logged_in:
     st.stop()
 
-# -----------------------------------------
-# Welcome Banner (Only Once Per Session)
-# -----------------------------------------
-st.markdown('<div class="sgs-banner">SGS Annual Function 2025</div>', unsafe_allow_html=True)
-
+# -------------------------------------------------
+# Welcome Screen (shown only once)
+# -------------------------------------------------
 if not st.session_state.welcomed:
     c1, c2 = st.columns([1,2])
     with c1:
@@ -165,82 +145,92 @@ if not st.session_state.welcomed:
     st.session_state.welcomed = True
     st.rerun()
 
-# -----------------------------------------
-# Main Tabs
-# -----------------------------------------
+# -------------------------------------------------
+# Main Interface
+# -------------------------------------------------
+st.title("St. Gregorios H.S. School")
 tabs = st.tabs(["Home", "Registration", "List", "Notices", "Admin"])
 
+# -------------------------------------------------
 # Home Tab
+# -------------------------------------------------
 with tabs[0]:
     left, right = st.columns([1,3])
     with left:
         safe_show_image("mascot.png", width=200)
     with right:
         safe_show_image("logo.png", width=350)
-        st.title("St. Gregorios H.S. School")
         st.subheader("45th Annual Day – Talent Meets Opportunity")
 
-    # Show latest notice (optional)
-    df = load_csv(NOTICE_FILE, ["Timestamp","Title","Message","PostedBy"])
-    if not df.empty:
-        last = df.iloc[-1]
-        st.markdown(f"<div class='notice-banner'>📢 <b>{last['Title']}</b><br>{last['Message']}</div>", unsafe_allow_html=True)
+    # Show Latest Notice
+    if not notice_df.empty:
+        recent = notice_df.iloc[-1]
+        st.info(f"📢 **{recent['Title']}**\n\n{recent['Message']}")
 
     # Countdown
-    st.markdown(f"<div class='countdown'>⏳ Event Countdown: {time_difference(EVENT_DATETIME)}</div>", unsafe_allow_html=True)
-    st.caption(f"Logged in as: {st.session_state.mobile}")
+    st.write("⏳ **Countdown to Annual Function (20-Dec-2025):**")
+    st.success(time_left())
 
+# -------------------------------------------------
 # Registration Tab
+# -------------------------------------------------
 with tabs[1]:
-    st.header("Register for an Event")
+    st.header("Register Participation")
     with st.form("reg_form"):
         name = st.text_input("Name")
         clas = st.text_input("Class")
         sec = st.text_input("Section")
-        item = st.text_input("Event / Item")
+        item = st.text_input("Event")
         address = st.text_area("Address")
-        bus = st.radio("Using Bus?", ["Yes","No"])
+        bus = st.radio("Using School Bus?", ["Yes","No"])
         contact = st.text_input("Contact", value=st.session_state.mobile)
-        if st.form_submit_button("Submit"):
-            df = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contact","Address","Bus","Status"])
-            df.loc[len(df)] = [datetime.now(), name, clas, sec, item, contact, address, bus, "Pending"]
-            df.to_csv(REG_FILE, index=False)
-            st.success("✅ Registration Submitted!")
 
-# List Tab with Excel Export
+        if st.form_submit_button("Submit"):
+            r = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contact","Address","Bus","Status"])
+            r.loc[len(r)] = [datetime.now(), name, clas, sec, item, contact, address, bus, "Pending"]
+            r.to_csv(REG_FILE, index=False)
+            st.success("✅ Registration Submitted")
+
+# -------------------------------------------------
+# List Tab
+# -------------------------------------------------
 with tabs[2]:
     st.header("Registered Students")
-    r = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contact","Address","Bus","Status"])
-    st.dataframe(r, use_container_width=True)
+    df = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contact","Address","Bus","Status"])
+    st.dataframe(df)
 
-    excel_data = to_excel_bytes(r)
-    st.download_button("⬇️ Download Excel", data=excel_data, file_name="registrations.xlsx")
+    excel_data = to_excel_bytes(df)
+    st.download_button("⬇ Download as Excel", data=excel_data, file_name="registrations.xlsx")
 
+# -------------------------------------------------
 # Notices Tab
+# -------------------------------------------------
 with tabs[3]:
     st.header("Notices & Announcements")
     n = load_csv(NOTICE_FILE, ["Timestamp","Title","Message","PostedBy"])
     if n.empty:
         st.info("No notices yet")
     else:
-        for _, row in n.iterrows():
-            ts = pd.to_datetime(row["Timestamp"]).strftime("%d-%b-%Y %I:%M %p") if pd.notnull(row["Timestamp"]) else ""
-            st.write(f"### {row['Title']}\n{row['Message']}\n*Posted by {row['PostedBy']} on {ts}*")
+        for i, row in n.iterrows():
+            st.write(f"### {row['Title']}\n{row['Message']}\n*By {row['PostedBy']}*")
 
+# -------------------------------------------------
 # Admin Tab
+# -------------------------------------------------
 with tabs[4]:
     st.header("Admin Panel")
-    pw = st.text_input("Admin Password", type="password")
+    admin_pw = st.text_input("Enter Admin Password", type="password")
     if st.button("Login as Admin"):
-        if pw == ADMIN_PASSWORD:
-            st.success("✅ Admin Logged In")
-            t = st.text_input("Notice Title")
-            m = st.text_area("Notice Message")
-            b = st.text_input("Posted By", value="Admin")
+        if admin_pw == ADMIN_PASSWORD:
+            st.success("✅ Admin Verified")
+            title = st.text_input("Notice Title")
+            msg = st.text_area("Notice Message")
+            by = st.text_input("Posted By", value="Admin")
+
             if st.button("Post Notice"):
                 n = load_csv(NOTICE_FILE, ["Timestamp","Title","Message","PostedBy"])
-                n.loc[len(n)] = [datetime.now(), t, m, b]
+                n.loc[len(n)] = [datetime.now(), title, msg, by]
                 n.to_csv(NOTICE_FILE, index=False)
-                st.success("✅ Notice Posted!")
+                st.success("✅ Notice Posted")
         else:
             st.error("❌ Wrong Password")
