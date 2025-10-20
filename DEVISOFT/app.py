@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import random
+import random, os
 
 # --------------------
 # CONFIGURATION
@@ -9,12 +9,12 @@ import random
 ADMIN_PASSWORD = "sgs2025"
 REG_FILE = "registrations.csv"
 NOTICE_FILE = "notices.csv"
-ALLOWED_FILE = "allowed_users.csv"
+ALLOWED_FILE = "allowed_users.csv"   # make sure the file exists in the same folder as app.py
 
 st.set_page_config(page_title="SGS Annual Function", layout="wide")
 
 # --------------------
-# FUNCTION TO LOAD CSV
+# LOAD CSV (REGISTRATION & NOTICES)
 # --------------------
 def load_csv(file, columns):
     try:
@@ -24,24 +24,32 @@ def load_csv(file, columns):
         df.to_csv(file, index=False)
         return df
 
-# Load data files
 reg_df = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contact","Address","Bus","Status"])
 notice_df = load_csv(NOTICE_FILE, ["Timestamp","Title","Message","PostedBy"])
-allowed_df = load_csv(ALLOWED_FILE, ["mobile_number","student_name"])
 
-# ✅ Clean / normalize allowed mobile numbers
+# --------------------
+# LOAD allowed_users.csv USING ABSOLUTE PATH (MOST IMPORTANT FIX)
+# --------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))    # Folder where app.py is running
+ALLOWED_FILE_PATH = os.path.join(BASE_DIR, ALLOWED_FILE) # Full path to allowed_users.csv
+
+# ✅ Read the CSV safely
+allowed_df = pd.read_csv(ALLOWED_FILE_PATH)
+
+# ✅ Normalize mobile numbers (remove +91, spaces, keep last 10 digits)
 allowed_df["mobile_number"] = (
     allowed_df["mobile_number"]
     .astype(str)
     .str.replace(" ", "")
     .str.replace("+91", "")
     .str.strip()
-    .str[-10:]    # Always keep last 10 digits
+    .str[-10:]
 )
 
-# (TEMPORARY) Display contents for checking — remove later
-st.info("📂 Allowed Users Loaded Successfully:")
-st.dataframe(allowed_df)
+# ✅ DEBUG — Show Loaded CSV so we can confirm data is read
+st.info("✅ Allowed Users Loaded Successfully (From File Path):")
+st.write(ALLOWED_FILE_PATH)  # show the path being read
+st.dataframe(allowed_df)     # show contents (remove this later if needed)
 
 # --------------------
 # SESSION INITIALIZATION
@@ -50,13 +58,13 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
 # --------------------
-# LOGIN FUNCTION
+# LOGIN FUNCTION (OTP TEST MODE)
 # --------------------
 def login():
     st.sidebar.title("Login")
     mobile = st.sidebar.text_input("Enter 10-digit Mobile").strip()
 
-    # Ensure only last 10 digits
+    # Convert to last 10 digits if someone types +91xxxxxxxxxx
     if len(mobile) > 10:
         mobile = mobile[-10:]
 
@@ -86,14 +94,16 @@ if not st.session_state.logged_in:
     st.stop()
 
 # --------------------
-# MAIN APP TABS
+# MAIN TABS
 # --------------------
 tabs = st.tabs(["Home", "Registration", "List", "Notices", "Admin"])
 
+# HOME TAB
 with tabs[0]:
     st.title("St. Gregorios H.S. School")
     st.subheader("Annual Function App")
 
+# REGISTRATION TAB
 with tabs[1]:
     st.header("Register")
     with st.form("reg"):
@@ -111,10 +121,12 @@ with tabs[1]:
             df.to_csv(REG_FILE, index=False)
             st.success("✅ Registered Successfully")
 
+# LIST TAB
 with tabs[2]:
     st.header("Registered Students")
     st.dataframe(pd.read_csv(REG_FILE))
 
+# NOTICES TAB
 with tabs[3]:
     st.header("Notices")
     df = pd.read_csv(NOTICE_FILE)
@@ -128,6 +140,7 @@ with tabs[3]:
 *Posted by {r['PostedBy']}*
 """)
 
+# ADMIN TAB
 with tabs[4]:
     st.header("Admin Section")
     pw = st.text_input("Admin Password", type="password")
