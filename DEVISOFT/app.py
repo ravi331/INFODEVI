@@ -9,7 +9,7 @@ import random, os
 ADMIN_PASSWORD = "sgs2025"
 REG_FILE = "registrations.csv"
 NOTICE_FILE = "notices.csv"
-ALLOWED_FILE = "allowed_users.csv"   # make sure the file exists in the same folder as app.py
+ALLOWED_FILE = "allowed_users.csv"   # must be in same folder as app.py
 
 st.set_page_config(page_title="SGS Annual Function", layout="wide")
 
@@ -28,15 +28,14 @@ reg_df = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contac
 notice_df = load_csv(NOTICE_FILE, ["Timestamp","Title","Message","PostedBy"])
 
 # --------------------
-# LOAD allowed_users.csv USING ABSOLUTE PATH (MOST IMPORTANT FIX)
+# LOAD allowed_users.csv USING ABSOLUTE PATH
 # --------------------
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))    # Folder where app.py is running
-ALLOWED_FILE_PATH = os.path.join(BASE_DIR, ALLOWED_FILE) # Full path to allowed_users.csv
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))    
+ALLOWED_FILE_PATH = os.path.join(BASE_DIR, ALLOWED_FILE)
 
-# ✅ Read the CSV safely
 allowed_df = pd.read_csv(ALLOWED_FILE_PATH)
 
-# ✅ Normalize mobile numbers (remove +91, spaces, keep last 10 digits)
+# ✅ Normalize phone numbers in CSV
 allowed_df["mobile_number"] = (
     allowed_df["mobile_number"]
     .astype(str)
@@ -46,10 +45,10 @@ allowed_df["mobile_number"] = (
     .str[-10:]
 )
 
-# ✅ DEBUG — Show Loaded CSV so we can confirm data is read
-st.info("✅ Allowed Users Loaded Successfully (From File Path):")
-st.write(ALLOWED_FILE_PATH)  # show the path being read
-st.dataframe(allowed_df)     # show contents (remove this later if needed)
+# 🔍 Debug: show allowed users (remove later if you want)
+st.info("✅ Allowed Users Loaded (from file):")
+st.write(ALLOWED_FILE_PATH)
+st.dataframe(allowed_df)
 
 # --------------------
 # SESSION INITIALIZATION
@@ -64,7 +63,7 @@ def login():
     st.sidebar.title("Login")
     mobile = st.sidebar.text_input("Enter 10-digit Mobile").strip()
 
-    # Convert to last 10 digits if someone types +91xxxxxxxxxx
+    # Ensure only last 10 digits
     if len(mobile) > 10:
         mobile = mobile[-10:]
 
@@ -73,7 +72,8 @@ def login():
             otp = str(random.randint(100000, 999999))
             st.session_state.otp = otp
             st.session_state.mobile = mobile
-            st.sidebar.success("OTP (Test Mode): " + otp)
+            # ✅ Hide OTP - do not display
+            st.sidebar.success("OTP sent to your mobile")
         else:
             st.sidebar.error("❌ This number is not registered")
 
@@ -98,8 +98,13 @@ if not st.session_state.logged_in:
 # --------------------
 tabs = st.tabs(["Home", "Registration", "List", "Notices", "Admin"])
 
-# HOME TAB
+# ✅ HOME TAB — mascot appears here
 with tabs[0]:
+    if os.path.exists(os.path.join(BASE_DIR, "mascot.png")):
+        st.image("mascot.png", width=200)
+    elif os.path.exists(os.path.join(BASE_DIR, "logo.png")):
+        st.image("logo.png", width=200)
+
     st.title("St. Gregorios H.S. School")
     st.subheader("Annual Function App")
 
@@ -131,7 +136,7 @@ with tabs[3]:
     st.header("Notices")
     df = pd.read_csv(NOTICE_FILE)
     if df.empty:
-        st.info("No notices yet")
+        st.warning("No notices yet")
     else:
         for _, r in df.iterrows():
             st.write(f"""
