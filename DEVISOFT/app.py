@@ -9,14 +9,12 @@ import random
 ADMIN_PASSWORD = "sgs2025"
 REG_FILE = "registrations.csv"
 NOTICE_FILE = "notices.csv"
-
-# ✅ Load allowed users DIRECTLY from GitHub (fixed issue)
-ALLOWED_CSV_URL = "https://raw.githubusercontent.com/ravi331/DEVISOFT/main/allowed_users.csv"
+ALLOWED_FILE = "allowed_users.csv"
 
 st.set_page_config(page_title="SGS Annual Function", layout="wide")
 
 # --------------------
-# FUNCTION TO LOAD CSV (Registrations & Notices only)
+# FUNCTION TO LOAD CSV
 # --------------------
 def load_csv(file, columns):
     try:
@@ -26,26 +24,23 @@ def load_csv(file, columns):
         df.to_csv(file, index=False)
         return df
 
+# Load data files
 reg_df = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contact","Address","Bus","Status"])
 notice_df = load_csv(NOTICE_FILE, ["Timestamp","Title","Message","PostedBy"])
+allowed_df = load_csv(ALLOWED_FILE, ["mobile_number","student_name"])
 
-# ✅ Load allowed users from GitHub
-# ✅ Load allowed users locally (no URL required)
-allowed_df = pd.read_csv("allowed_users.csv")
-
-# ✅ Clean formatting
+# ✅ Clean / normalize allowed mobile numbers
 allowed_df["mobile_number"] = (
     allowed_df["mobile_number"]
     .astype(str)
     .str.replace(" ", "")
     .str.replace("+91", "")
     .str.strip()
-    .str[-10:]
+    .str[-10:]    # Always keep last 10 digits
 )
 
-
-# 🔍 Debug (You can remove after testing)
-st.write("✅ Loaded Allowed Users from GitHub:")
+# (TEMPORARY) Display contents for checking — remove later
+st.info("📂 Allowed Users Loaded Successfully:")
 st.dataframe(allowed_df)
 
 # --------------------
@@ -61,7 +56,7 @@ def login():
     st.sidebar.title("Login")
     mobile = st.sidebar.text_input("Enter 10-digit Mobile").strip()
 
-    # If someone types +91xxxxxxxxxx → we still take last 10 digits
+    # Ensure only last 10 digits
     if len(mobile) > 10:
         mobile = mobile[-10:]
 
@@ -83,22 +78,22 @@ def login():
             else:
                 st.sidebar.error("❌ Wrong OTP")
 
-# Run login
+# --------------------
+# RUN LOGIN
+# --------------------
 login()
 if not st.session_state.logged_in:
     st.stop()
 
 # --------------------
-# MAIN TABS AFTER LOGIN
+# MAIN APP TABS
 # --------------------
 tabs = st.tabs(["Home", "Registration", "List", "Notices", "Admin"])
 
-# HOME TAB
 with tabs[0]:
     st.title("St. Gregorios H.S. School")
     st.subheader("Annual Function App")
 
-# REGISTRATION TAB
 with tabs[1]:
     st.header("Register")
     with st.form("reg"):
@@ -116,12 +111,10 @@ with tabs[1]:
             df.to_csv(REG_FILE, index=False)
             st.success("✅ Registered Successfully")
 
-# LIST TAB
 with tabs[2]:
     st.header("Registered Students")
     st.dataframe(pd.read_csv(REG_FILE))
 
-# NOTICES TAB
 with tabs[3]:
     st.header("Notices")
     df = pd.read_csv(NOTICE_FILE)
@@ -135,7 +128,6 @@ with tabs[3]:
 *Posted by {r['PostedBy']}*
 """)
 
-# ADMIN TAB
 with tabs[4]:
     st.header("Admin Section")
     pw = st.text_input("Admin Password", type="password")
@@ -153,4 +145,3 @@ with tabs[4]:
                 st.success("✅ Notice Posted")
         else:
             st.error("❌ Incorrect password")
-
