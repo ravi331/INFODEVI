@@ -1,9 +1,11 @@
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os, random
 
+# --------------------
+# CONFIGURATION
+# --------------------
 ADMIN_PASSWORD = "sgs2025"
 REG_FILE = "registrations.csv"
 NOTICE_FILE = "notices.csv"
@@ -11,6 +13,9 @@ ALLOWED_FILE = "allowed_users.csv"
 
 st.set_page_config(page_title="SGS Annual Function", layout="wide")
 
+# --------------------
+# LOAD CSV FUNCTION
+# --------------------
 def load_csv(file, columns):
     try:
         return pd.read_csv(file)
@@ -19,19 +24,41 @@ def load_csv(file, columns):
         df.to_csv(file, index=False)
         return df
 
+# Load CSVs
 reg_df = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contact","Address","Bus","Status"])
 notice_df = load_csv(NOTICE_FILE, ["Timestamp","Title","Message","PostedBy"])
 allowed_df = load_csv(ALLOWED_FILE, ["mobile_number","student_name"])
 
+# ✅ Clean / normalize mobile numbers in CSV (always keep last 10 digits)
+allowed_df["mobile_number"] = (
+    allowed_df["mobile_number"]
+    .astype(str)
+    .str.replace(" ", "")
+    .str.replace("+91", "")
+    .str.replace("-", "")
+    .str.strip()
+    .str[-10:]               # Always last 10 digits
+)
+
+# --------------------
+# SESSION INIT
+# --------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
+# --------------------
+# LOGIN FUNCTION
+# --------------------
 def login():
     st.sidebar.title("Login")
-    mobile = st.sidebar.text_input("Enter 10-digit Mobile")
+    mobile = st.sidebar.text_input("Enter 10-digit Mobile").strip()
+
+    # Keep only last 10 digits if user types +91 or country code
+    if len(mobile) > 10:
+        mobile = mobile[-10:]
 
     if st.sidebar.button("Send OTP"):
-        if mobile in allowed_df["mobile_number"].astype(str).values:
+        if mobile in allowed_df["mobile_number"].values:
             otp = str(random.randint(100000,999999))
             st.session_state.otp = otp
             st.session_state.mobile = mobile
@@ -48,16 +75,24 @@ def login():
             else:
                 st.sidebar.error("Wrong OTP")
 
+# --------------------
+# RUN LOGIN
+# --------------------
 login()
 if not st.session_state.logged_in:
     st.stop()
 
+# --------------------
+# MAIN APP TABS
+# --------------------
 tabs = st.tabs(["Home","Registration","List","Notices","Admin"])
 
+# HOME TAB
 with tabs[0]:
     st.title("St. Gregorios H.S. School")
     st.subheader("Annual Function App")
 
+# REGISTRATION TAB
 with tabs[1]:
     st.header("Register")
     with st.form("reg"):
@@ -68,16 +103,19 @@ with tabs[1]:
         address = st.text_area("Address")
         bus = st.radio("Using Bus?",["Yes","No"])
         contact = st.text_input("Contact", value=st.session_state.mobile)
+
         if st.form_submit_button("Submit"):
             df = pd.read_csv(REG_FILE)
             df.loc[len(df)] = [datetime.now(), name, clas, sec, item, contact, address, bus, "Pending"]
             df.to_csv(REG_FILE, index=False)
             st.success("Registered")
 
+# LIST TAB
 with tabs[2]:
     st.header("Registered Students")
     st.dataframe(pd.read_csv(REG_FILE))
 
+# NOTICES TAB
 with tabs[3]:
     st.header("Notices")
     df = pd.read_csv(NOTICE_FILE)
@@ -87,9 +125,11 @@ with tabs[3]:
         for _, r in df.iterrows():
             st.write(f"""
 ### {r['Title']}
-**{r['ShortDesc']}**
+{r['Message']}
 *Posted by {r['PostedBy']}*
 """)
+
+# ADMIN TAB
 with tabs[4]:
     st.header("Admin")
     pw = st.text_input("Admin Password", type="password")
@@ -99,6 +139,7 @@ with tabs[4]:
             title = st.text_input("Notice Title")
             msg = st.text_area("Message")
             by = st.text_input("Posted By", value="Admin")
+
             if st.button("Post Notice"):
                 df = pd.read_csv(NOTICE_FILE)
                 df.loc[len(df)] = [datetime.now(), title, msg, by]
@@ -106,5 +147,3 @@ with tabs[4]:
                 st.success("Posted")
         else:
             st.error("Incorrect password")
-
-
