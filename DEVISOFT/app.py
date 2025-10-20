@@ -28,6 +28,9 @@ def load_csv(file, columns):
 reg_df = load_csv(REG_FILE, ["Timestamp","Name","Class","Section","Item","Contact","Address","Bus","Status"])
 notice_df = load_csv(NOTICE_FILE, ["Timestamp","Title","Message","PostedBy"])
 allowed_df = load_csv(ALLOWED_FILE, ["mobile_number","student_name"])
+# 🔍 Debug: Check if CSV is loaded correctly
+st.write("✅ Loaded Allowed Users:")
+st.dataframe(allowed_df)
 
 # ✅ Clean / normalize mobile numbers in CSV (always keep last 10 digits)
 allowed_df["mobile_number"] = (
@@ -147,3 +150,4 @@ with tabs[4]:
                 st.success("Posted")
         else:
             st.error("Incorrect password")
+
